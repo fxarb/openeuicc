@@ -19,20 +19,20 @@ jobs:
         uses: timheuer/base64-to-file@v1.2.4
         with:
           fileName: openeuicc.keystore
-          fileDir: ${{ env.GITHUB_WORKSPACE }}/keystoredir
+          fileDir: ${{ env.GITHUB_WORKSPACE }}
           encodedString: ${{ secrets.SIGNINGKEYBASE64 }}
           
       - name: Decode Secret Signing Configuration
         uses: timheuer/base64-to-file@v1.2.4
         with:
           fileName: keystore.properties
-          fileDir: ${{ env.GITHUB_WORKSPACE }}/keystoredir
+          fileDir: ${{ env.GITHUB_WORKSPACE }}
           encodedString: ${{ secrets.OPENEUICC_SIGNING_CONFIG }}
 
       - name: Add Keystore Path to Config
         run:  |
-          sudo chmod 666 ${{ env.GITHUB_WORKSPACE }}/keystoredir/keystore.properties
-          sudo echo "storeFile=${{ env.GITHUB_WORKSPACE }}/keystoredir/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystoredir/keystore.properties
+          sudo chmod 666 ${{ env.GITHUB_WORKSPACE }}/keystore.properties
+          sudo echo "storeFile=${{ env.GITHUB_WORKSPACE }}/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystore.properties
 
 
       - name: Set up JDK 17
