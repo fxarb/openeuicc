@@ -12,6 +12,7 @@ jobs:
       - name: Repository Checkout
         uses: actions/checkout@v4
         with:
+          repository: 'fxarb/openeuicc'
           submodules: recursive
 
       - name: Decode Keystore
