@@ -1,0 +1,53 @@
+on:
+  push:
+    tags: '*'
+
+env:
+  # Enable reproducibility-related build system workarounds
+  REPRODUCIBLE_BUILD: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Decode Keystore
+        uses: https://github.com/timheuer/base64-to-file@v1.2.4
+        with:
+          fileName: openeuicc.keystore
+          fileDir: ${{ env.GITHUB_WORKSPACE }}
+          encodedString: ${{ secrets.SIGNINGKEYBASE64 }}
+          
+      - name: Decode Secret Signing Configuration
+        uses: https://github.com/timheuer/base64-to-file@v1.2.4
+        with:
+          fileName: keystore.properties
+          fileDir: ${{ env.GITHUB_WORKSPACE }}
+          encodedString: ${{ secrets.OPENEUICC_SIGNING_CONFIG }}
+
+      - name: Add Keystore Path to Config
+        run:  |
+          echo "storeFile=${{ env.GITHUB_WORKSPACE }}/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystore.properties
+
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Release APK ( OpenEUICC only)
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload APK files
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenEUICC.apk
+          path: app/build/outputs/apk/release/*.apk
