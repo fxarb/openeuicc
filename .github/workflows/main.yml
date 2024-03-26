@@ -15,14 +15,14 @@ jobs:
           submodules: recursive
 
       - name: Decode Keystore
-        uses: https://github.com/timheuer/base64-to-file@v1.2.4
+        uses: timheuer/base64-to-file@v1.2.4
         with:
           fileName: openeuicc.keystore
           fileDir: ${{ env.GITHUB_WORKSPACE }}
           encodedString: ${{ secrets.SIGNINGKEYBASE64 }}
           
       - name: Decode Secret Signing Configuration
-        uses: https://github.com/timheuer/base64-to-file@v1.2.4
+        uses: timheuer/base64-to-file@v1.2.4
         with:
           fileName: keystore.properties
           fileDir: ${{ env.GITHUB_WORKSPACE }}
