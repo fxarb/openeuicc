@@ -31,6 +31,7 @@ jobs:
 
       - name: Add Keystore Path to Config
         run:  |
+          sudo chmod 666 ${{ env.GITHUB_WORKSPACE }}/keystoredir/keystore.properties
           sudo echo "storeFile=${{ env.GITHUB_WORKSPACE }}/keystoredir/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystoredir/keystore.properties
 
 
