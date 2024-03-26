@@ -31,7 +31,7 @@ jobs:
 
       - name: Add Keystore Path to Config
         run:  |
-          echo "storeFile=${{ env.GITHUB_WORKSPACE }}/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystore.properties
+          sudo echo "storeFile=${{ env.GITHUB_WORKSPACE }}/openeuicc.keystore" >> ${{ env.GITHUB_WORKSPACE }}/keystore.properties
 
 
       - name: Set up JDK 17
