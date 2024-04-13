@@ -1,5 +1,6 @@
 package im.angry.openeuicc.service
 
+import android.os.Build
 import android.service.euicc.*
 import android.telephony.UiccSlotMapping
 import android.telephony.euicc.DownloadableSubscription
@@ -14,6 +15,21 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
     companion object {
         const val TAG = "OpenEuiccService"
     }
+
+    private val hasInternalEuicc by lazy {
+        telephonyManager.uiccCardsInfoCompat.any { it.isEuicc && !it.isRemovable }
+    }
+
+    // TODO: Should this be configurable?
+    private fun shouldIgnoreSlot(physicalSlotId: Int) =
+        if (hasInternalEuicc) {
+            // For devices with an internal eUICC slot, ignore any removable UICC
+            telephonyManager.uiccCardsInfoCompat.find { it.physicalSlotIndex == physicalSlotId }!!.isRemovable
+        } else {
+            // Otherwise, we can report at least one removable eUICC to the system without confusing
+            // it too much.
+            telephonyManager.uiccCardsInfoCompat.firstOrNull { it.isEuicc }?.physicalSlotIndex == physicalSlotId
+        }
 
     private fun findChannel(physicalSlotId: Int): EuiccChannel? =
         euiccChannelManager.findEuiccChannelByPhysicalSlotBlocking(physicalSlotId)
@@ -34,6 +50,10 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
         lpa.profiles.any { it.iccid == iccid }
 
     private fun ensurePortIsMapped(slotId: Int, portId: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return
+        }
+
         val mappings = telephonyManager.simSlotMapping.toMutableList()
 
         mappings.firstOrNull { it.physicalSlotIndex == slotId && it.portIndex == portId }?.let {
@@ -106,6 +126,11 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
 
     override fun onGetEuiccProfileInfoList(slotId: Int): GetEuiccProfileInfoListResult {
         Log.i(TAG, "onGetEuiccProfileInfoList slotId=$slotId")
+        if (shouldIgnoreSlot(slotId)) {
+            Log.i(TAG, "ignoring slot $slotId")
+            return GetEuiccProfileInfoListResult(RESULT_FIRST_USER, arrayOf(), true)
+        }
+
         val channel = findChannel(slotId)!!
         val profiles = channel.lpa.profiles.operational.map {
             EuiccProfileInfo.Builder(it.iccid).apply {
@@ -137,6 +162,8 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
 
     override fun onDeleteSubscription(slotId: Int, iccid: String): Int {
         Log.i(TAG, "onDeleteSubscription slotId=$slotId iccid=$iccid")
+        if (shouldIgnoreSlot(slotId)) return RESULT_FIRST_USER
+
         try {
             val channels = findAllChannels(slotId) ?: return RESULT_FIRST_USER
 
@@ -182,6 +209,8 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
         forceDeactivateSim: Boolean
     ): Int {
         Log.i(TAG,"onSwitchToSubscriptionWithPort slotId=$slotId portIndex=$portIndex iccid=$iccid forceDeactivateSim=$forceDeactivateSim")
+        if (shouldIgnoreSlot(slotId)) return RESULT_FIRST_USER
+
         try {
             // retryWithTimeout is needed here because this function may be called just after
             // AOSP has switched slot mappings, in which case the slots may not be ready yet.
@@ -232,6 +261,7 @@ class OpenEuiccService : EuiccService(), OpenEuiccContextMarker {
 
     override fun onUpdateSubscriptionNickname(slotId: Int, iccid: String, nickname: String?): Int {
         Log.i(TAG, "onUpdateSubscriptionNickname slotId=$slotId iccid=$iccid nickname=$nickname")
+        if (shouldIgnoreSlot(slotId)) return RESULT_FIRST_USER
         val channel = findChannel(slotId) ?: return RESULT_FIRST_USER
         if (!channel.profileExists(iccid)) {
             return RESULT_FIRST_USER
