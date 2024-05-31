@@ -3,14 +3,15 @@ package im.angry.openeuicc.ui
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.DialogInterface
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.text.Editable
-import android.text.format.Formatter
 import android.util.Log
 import android.view.*
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputLayout
@@ -55,11 +56,36 @@ class ProfileDownloadFragment : BaseMaterialDialogFragment(),
     private val barcodeScannerLauncher = registerForActivityResult(ScanContract()) { result ->
         result.contents?.let { content ->
             Log.d(TAG, content)
-            val components = content.split("$")
-            if (components.size < 3 || components[0] != "LPA:1") return@registerForActivityResult
-            profileDownloadServer.editText?.setText(components[1])
-            profileDownloadCode.editText?.setText(components[2])
+            onScanResult(content)
         }
+    }
+
+    private val gallerySelectorLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { result ->
+        if (result == null) return@registerForActivityResult
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                requireContext().contentResolver.openInputStream(result)?.let { input ->
+                    val bmp = BitmapFactory.decodeStream(input)
+                    input.close()
+
+                    decodeQrFromBitmap(bmp)?.let {
+                        withContext(Dispatchers.Main) {
+                            onScanResult(it)
+                        }
+                    }
+
+                    bmp.recycle()
+                }
+            }
+        }
+    }
+
+    private fun onScanResult(result: String) {
+        val components = result.split("$")
+        if (components.size < 3 || components[0] != "LPA:1") return
+        profileDownloadServer.editText?.setText(components[1])
+        profileDownloadCode.editText?.setText(components[2])
     }
 
     override fun onCreateView(
@@ -104,6 +130,10 @@ class ProfileDownloadFragment : BaseMaterialDialogFragment(),
                 })
                 true
             }
+            R.id.scan_from_gallery -> {
+                gallerySelectorLauncher.launch("image/*")
+                true
+            }
             R.id.ok -> {
                 startDownloadProfile()
                 true
@@ -131,7 +161,7 @@ class ProfileDownloadFragment : BaseMaterialDialogFragment(),
             // Fetch remaining NVRAM
             val str = channel.lpa.euiccInfo2?.freeNvram?.also {
                 freeNvram = it
-            }?.let { Formatter.formatShortFileSize(requireContext(), it.toLong()) }
+            }?.let { formatFreeSpace(it) }
 
             withContext(Dispatchers.Main) {
                 profileDownloadFreeSpace.text = getString(R.string.profile_download_free_space,
